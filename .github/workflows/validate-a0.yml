@@ -1,10 +1,17 @@
 name: validate-a0-source
 on:
   push:
+    paths:
+      - 'src/runtime-core/archviz/installer.py'
+      - 'src/bootstrap/archviz82/bootstrap_a0.ps1'
+      - 'src/bootstrap/archviz82/planner.py'
+      - 'src/bootstrap/archviz82/test_planner.py'
+      - 'src/runtime-core/archviz/test_profile_defaults.py'
+      - 'tools/**'
+      - '.github/workflows/validate-a0.yml'
   pull_request:
 jobs:
   validate:
-    if: ${{ hashFiles('src/runtime-core/archviz/installer.py') != '' && hashFiles('src/bootstrap/archviz82/bootstrap_a0.ps1') != '' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
