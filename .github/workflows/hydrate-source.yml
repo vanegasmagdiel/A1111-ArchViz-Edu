@@ -16,14 +16,17 @@ jobs:
         with:
           python-version: '3.10'
       - name: Rehydrate frozen sources from chunked payloads
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           import base64, gzip, hashlib
           from pathlib import Path
+
           specs = [
               (Path('.source_payload/chunks/bootstrap'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'),
               (Path('.source_payload/chunks/installer'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'),
           ]
+
           for chunk_dir, dst, expected in specs:
               parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
               if not parts:
@@ -35,13 +38,14 @@ jobs:
               print(f'DECODED {dst}: {got} (expected transport hash: {expected})')
               dst.parent.mkdir(parents=True, exist_ok=True)
               dst.write_bytes(data)
-          # Syntax-level gate before any commit.
+
           import py_compile
           py_compile.compile('src/runtime-core/archviz/installer.py', doraise=True)
           print('PASS installer.py syntax')
           if not Path('src/bootstrap/archviz82/bootstrap_a0.ps1').read_text(encoding='utf-8-sig').strip():
               raise SystemExit('bootstrap_a0.ps1 empty')
           print('PASS bootstrap_a0.ps1 non-empty')
+          PY
       - name: Commit hydrated sources and remove transport payload
         shell: bash
         run: |
