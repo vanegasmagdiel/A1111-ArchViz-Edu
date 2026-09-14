@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - '.source_payload/**'
+      - '.github/workflows/hydrate-source.yml'
 permissions:
   contents: write
 jobs:
@@ -27,10 +28,14 @@ jobs:
               parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
               if not parts:
                   raise SystemExit(f'no payload chunks for {dst}')
-              encoded = ''.join(p.read_text(encoding='ascii') for p in parts)
-              packed = base64.b64decode(encoded, validate=True)
-              data = gzip.decompress(packed)
+              encoded = ''.join(''.join(p.read_text(encoding='ascii').split()) for p in parts)
+              try:
+                  packed = base64.b64decode(encoded, validate=True)
+                  data = gzip.decompress(packed)
+              except Exception as exc:
+                  raise SystemExit(f'payload decode failed for {dst}: {exc}')
               got = hashlib.sha256(data).hexdigest()
+              print(f'CHECK {dst}: {got}')
               if got != expected:
                   raise SystemExit(f'hash mismatch for {dst}: {got} != {expected}')
               dst.parent.mkdir(parents=True, exist_ok=True)
