@@ -14,12 +14,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Rehydrate frozen sources or persist diagnostic
+      - name: Rehydrate exact frozen sources or persist diagnostic
         shell: bash
         run: |
           python - <<'PY'
-          import base64, gzip, hashlib, traceback, py_compile
+          import base64, gzip, hashlib, traceback, py_compile, zlib
           from pathlib import Path
+
+          def gunzip_recover(blob):
+              try:
+                  return gzip.decompress(blob), 'gzip'
+              except gzip.BadGzipFile as exc:
+                  # Transport chunks can preserve the deflate payload while a gzip CRC/trailer
+                  # byte is damaged. Recover the payload without trusting the trailer, then
+                  # require the canonical source SHA-256 before accepting it.
+                  if len(blob) < 18 or blob[:2] != b'\x1f\x8b' or blob[2] != 8:
+                      raise
+                  flg = blob[3]
+                  i = 10
+                  if flg & 4:
+                      xlen = int.from_bytes(blob[i:i+2], 'little'); i += 2 + xlen
+                  if flg & 8:
+                      while blob[i] != 0: i += 1
+                      i += 1
+                  if flg & 16:
+                      while blob[i] != 0: i += 1
+                      i += 1
+                  if flg & 2:
+                      i += 2
+                  return zlib.decompress(blob[i:-8], -zlib.MAX_WBITS), f'raw-deflate fallback after {exc}'
 
           diag = []
           ok = True
@@ -38,9 +61,9 @@ jobs:
                   diag.append(f'{dst}: encoded_chars={len(encoded)} mod4={len(encoded)%4}')
                   packed = base64.b64decode(encoded, validate=True)
                   diag.append(f'{dst}: packed_bytes={len(packed)} gzip_magic={packed[:2].hex()}')
-                  data = gzip.decompress(packed)
+                  data, method = gunzip_recover(packed)
                   got = hashlib.sha256(data).hexdigest()
-                  diag.append(f'{dst}: decoded_bytes={len(data)} sha256={got} expected={expected}')
+                  diag.append(f'{dst}: method={method}; decoded_bytes={len(data)} sha256={got} expected={expected}')
                   if got != expected:
                       raise RuntimeError(f'hash mismatch for {dst}: {got} != {expected}')
                   dst.parent.mkdir(parents=True, exist_ok=True)
@@ -48,7 +71,7 @@ jobs:
               py_compile.compile('src/runtime-core/archviz/installer.py', doraise=True)
               if not Path('src/bootstrap/archviz82/bootstrap_a0.ps1').read_text(encoding='utf-8-sig').strip():
                   raise RuntimeError('bootstrap_a0.ps1 empty')
-              diag.append('PASS: decoded hashes and syntax gates')
+              diag.append('PASS: canonical hashes and syntax gates')
           except Exception:
               ok = False
               diag.append('FAIL:\n' + traceback.format_exc())
@@ -56,7 +79,7 @@ jobs:
           Path('.source_payload/HYDRATE_DIAGNOSTIC.txt').write_text('\n'.join(diag) + '\n', encoding='utf-8')
           Path('.source_payload/HYDRATE_OK').write_text('1\n' if ok else '0\n', encoding='ascii')
           PY
-      - name: Commit diagnostic or hydrated source
+      - name: Commit exact source or diagnostic
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
