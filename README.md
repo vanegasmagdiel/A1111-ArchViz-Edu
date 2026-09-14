@@ -5,7 +5,7 @@
 
 A1111 ArchViz is an independent educational/research project that demonstrates a reproducible, hardware-aware Windows bootstrap for AUTOMATIC1111 focused on architectural visualization with SDXL, ControlNet, LoRA and verified model manifests.
 
-> This repository does not redistribute the large third-party model weights. The installer downloads pinned artifacts from upstream sources and verifies them. Every third-party component remains subject to its own license and terms.
+> This repository does not redistribute the large third-party model weights. The installer design downloads pinned artifacts from upstream sources and verifies them. Every third-party component remains subject to its own license and terms.
 
 ## Educational goals
 
@@ -28,15 +28,17 @@ A1111 ArchViz is an independent educational/research project that demonstrates a
 - verified model/VAE/LoRA/ControlNet catalog;
 - real generation smoke tests before PASS.
 
-## Quick start
+## GitHub publication
 
-1. Download the GitHub Release asset `A1111_ArchViz_v8.2_A0_STABLE_EDU_GH1.zip`.
-2. Verify its SHA-256 against the release checksums.
-3. Extract it to a new local folder.
-4. Run `INSTALAR_A1111_ARCHVIZ.bat`.
-5. Review the detected hardware, target directory and profile before confirming.
+This repository publishes the **auditable educational source baseline**. GitHub Releases/tags preserve each stable engineering milestone without duplicating the main repository.
 
-The installer is intentionally one-BAT for the user; technical detail is written to runtime logs.
+For source review or teaching:
+
+1. Clone or download the tagged source release.
+2. Review `src/`, `docs/`, `THIRD_PARTY_NOTICES.md`, `REFERENCES.md` and `SBOM.spdx.json`.
+3. Use the CI result as the repository-level integrity gate.
+
+The previously audited one-click installer ZIP is tracked by checksum in `release/SHA256SUMS.txt`. It is **not silently rebuilt from the GitHub tree**, because the frozen A0 bootstrap includes the packaged CORE SHA-256 as part of its integrity contract. Any rebuilt installer package must therefore be published explicitly as a new packaging revision.
 
 ## Validated A0 reference platform
 
