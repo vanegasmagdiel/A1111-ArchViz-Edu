@@ -3,7 +3,6 @@ on:
   push:
     branches: [main]
     paths:
-      - '.source_payload/**'
       - '.github/workflows/hydrate-source.yml'
 permissions:
   contents: write
@@ -15,43 +14,59 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Rehydrate frozen sources from chunked payloads
+      - name: Rehydrate frozen sources or persist diagnostic
         shell: bash
         run: |
           python - <<'PY'
-          import base64, gzip, hashlib
+          import base64, gzip, hashlib, traceback, py_compile
           from pathlib import Path
 
+          diag = []
+          ok = True
           specs = [
               (Path('.source_payload/chunks/bootstrap'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'),
               (Path('.source_payload/chunks/installer'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'),
           ]
+          try:
+              for chunk_dir, dst, expected in specs:
+                  parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
+                  lengths = [p.stat().st_size for p in parts]
+                  diag.append(f'{dst}: parts={[p.name for p in parts]} sizes={lengths}')
+                  if not parts:
+                      raise RuntimeError(f'no payload chunks for {dst}')
+                  encoded = ''.join(''.join(p.read_text(encoding='ascii').split()) for p in parts)
+                  diag.append(f'{dst}: encoded_chars={len(encoded)} mod4={len(encoded)%4}')
+                  packed = base64.b64decode(encoded, validate=True)
+                  diag.append(f'{dst}: packed_bytes={len(packed)} gzip_magic={packed[:2].hex()}')
+                  data = gzip.decompress(packed)
+                  got = hashlib.sha256(data).hexdigest()
+                  diag.append(f'{dst}: decoded_bytes={len(data)} sha256={got} expected={expected}')
+                  if got != expected:
+                      raise RuntimeError(f'hash mismatch for {dst}: {got} != {expected}')
+                  dst.parent.mkdir(parents=True, exist_ok=True)
+                  dst.write_bytes(data)
+              py_compile.compile('src/runtime-core/archviz/installer.py', doraise=True)
+              if not Path('src/bootstrap/archviz82/bootstrap_a0.ps1').read_text(encoding='utf-8-sig').strip():
+                  raise RuntimeError('bootstrap_a0.ps1 empty')
+              diag.append('PASS: decoded hashes and syntax gates')
+          except Exception:
+              ok = False
+              diag.append('FAIL:\n' + traceback.format_exc())
 
-          for chunk_dir, dst, expected in specs:
-              parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
-              if not parts:
-                  raise SystemExit(f'no payload chunks for {dst}')
-              encoded = ''.join(''.join(p.read_text(encoding='ascii').split()) for p in parts)
-              packed = base64.b64decode(encoded)
-              data = gzip.decompress(packed)
-              got = hashlib.sha256(data).hexdigest()
-              print(f'DECODED {dst}: {got} (expected transport hash: {expected})')
-              dst.parent.mkdir(parents=True, exist_ok=True)
-              dst.write_bytes(data)
-
-          import py_compile
-          py_compile.compile('src/runtime-core/archviz/installer.py', doraise=True)
-          print('PASS installer.py syntax')
-          if not Path('src/bootstrap/archviz82/bootstrap_a0.ps1').read_text(encoding='utf-8-sig').strip():
-              raise SystemExit('bootstrap_a0.ps1 empty')
-          print('PASS bootstrap_a0.ps1 non-empty')
+          Path('.source_payload/HYDRATE_DIAGNOSTIC.txt').write_text('\n'.join(diag) + '\n', encoding='utf-8')
+          Path('.source_payload/HYDRATE_OK').write_text('1\n' if ok else '0\n', encoding='ascii')
           PY
-      - name: Commit hydrated sources and remove transport payload
+      - name: Commit diagnostic or hydrated source
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -rf .source_payload
-          git add -A
-          git commit -m "Hydrate frozen A0 source" || exit 0
+          if [ "$(cat .source_payload/HYDRATE_OK)" = "1" ]; then
+            rm -rf .source_payload
+            git add -A
+            git commit -m "Hydrate exact frozen A0 source" || exit 0
+          else
+            git add .source_payload/HYDRATE_DIAGNOSTIC.txt .source_payload/HYDRATE_OK
+            git commit -m "Record A0 hydration diagnostic" || exit 0
+          fi
           git push
