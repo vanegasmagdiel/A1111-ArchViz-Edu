@@ -9,77 +9,105 @@ permissions:
 jobs:
   hydrate:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Rehydrate exact frozen sources or persist diagnostic
+      - name: Repair transport and rehydrate canonical frozen sources
         shell: bash
         run: |
           python - <<'PY'
-          import base64, gzip, hashlib, traceback, py_compile, zlib
+          import base64, gzip, hashlib, traceback, py_compile, zlib, time
           from pathlib import Path
 
-          def gunzip_recover(blob):
-              try:
-                  return gzip.decompress(blob), 'gzip'
-              except gzip.BadGzipFile as exc:
-                  # Transport chunks can preserve the deflate payload while a gzip CRC/trailer
-                  # byte is damaged. Recover the payload without trusting the trailer, then
-                  # require the canonical source SHA-256 before accepting it.
-                  if len(blob) < 18 or blob[:2] != b'\x1f\x8b' or blob[2] != 8:
-                      raise
-                  flg = blob[3]
-                  i = 10
-                  if flg & 4:
-                      xlen = int.from_bytes(blob[i:i+2], 'little'); i += 2 + xlen
-                  if flg & 8:
-                      while blob[i] != 0: i += 1
-                      i += 1
-                  if flg & 16:
-                      while blob[i] != 0: i += 1
-                      i += 1
-                  if flg & 2:
-                      i += 2
-                  return zlib.decompress(blob[i:-8], -zlib.MAX_WBITS), f'raw-deflate fallback after {exc}'
+          ALPH = b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-          diag = []
-          ok = True
-          specs = [
-              (Path('.source_payload/chunks/bootstrap'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'),
-              (Path('.source_payload/chunks/installer'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'),
+          def raw_gunzip(blob):
+              if len(blob) < 18 or blob[:2] != b'\x1f\x8b' or blob[2] != 8:
+                  raise ValueError('not gzip/deflate')
+              flg = blob[3]; i = 10
+              if flg & 4:
+                  xlen = int.from_bytes(blob[i:i+2], 'little'); i += 2 + xlen
+              if flg & 8:
+                  while blob[i] != 0: i += 1
+                  i += 1
+              if flg & 16:
+                  while blob[i] != 0: i += 1
+                  i += 1
+              if flg & 2: i += 2
+              return zlib.decompress(blob[i:-8], -zlib.MAX_WBITS)
+
+          def decode_and_check(enc, expected):
+              try:
+                  packed = base64.b64decode(enc, validate=True)
+                  try: data = gzip.decompress(packed)
+                  except Exception: data = raw_gunzip(packed)
+                  if hashlib.sha256(data).hexdigest() == expected:
+                      return data
+              except Exception:
+                  return None
+              return None
+
+          def repair_one_char(encoded, expected, preferred=None):
+              original = bytearray(encoded.encode('ascii'))
+              direct = decode_and_check(original, expected)
+              if direct is not None:
+                  return direct, 'direct'
+              n = len(original)
+              ranges = []
+              if preferred:
+                  a,b = preferred; ranges.append(range(max(0,a), min(n,b)))
+                  ranges.append([i for i in range(n) if not (max(0,a) <= i < min(n,b))])
+              else:
+                  ranges = [range(n)]
+              tried=0; started=time.time()
+              for rg in ranges:
+                  for pos in rg:
+                      old = original[pos]
+                      if old == ord('='): continue
+                      for c in ALPH:
+                          if c == old: continue
+                          original[pos] = c
+                          tried += 1
+                          data = decode_and_check(original, expected)
+                          if data is not None:
+                              elapsed=time.time()-started
+                              return data, f'one-char repair pos={pos} {chr(old)}->{chr(c)} tries={tried} elapsed={elapsed:.1f}s'
+                      original[pos] = old
+                  # progress after preferred/all range
+                  print(f'progress expected={expected[:12]} tries={tried} elapsed={time.time()-started:.1f}s', flush=True)
+              return None, f'not repaired after {tried} candidates'
+
+          diag=[]; ok=True
+          specs=[
+              (Path('.source_payload/chunks/bootstrap'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f', (8000,16000)),
+              (Path('.source_payload/chunks/installer'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2', None),
           ]
           try:
-              for chunk_dir, dst, expected in specs:
-                  parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
-                  lengths = [p.stat().st_size for p in parts]
-                  diag.append(f'{dst}: parts={[p.name for p in parts]} sizes={lengths}')
-                  if not parts:
-                      raise RuntimeError(f'no payload chunks for {dst}')
-                  encoded = ''.join(''.join(p.read_text(encoding='ascii').split()) for p in parts)
-                  diag.append(f'{dst}: encoded_chars={len(encoded)} mod4={len(encoded)%4}')
-                  packed = base64.b64decode(encoded, validate=True)
-                  diag.append(f'{dst}: packed_bytes={len(packed)} gzip_magic={packed[:2].hex()}')
-                  data, method = gunzip_recover(packed)
-                  got = hashlib.sha256(data).hexdigest()
-                  diag.append(f'{dst}: method={method}; decoded_bytes={len(data)} sha256={got} expected={expected}')
-                  if got != expected:
-                      raise RuntimeError(f'hash mismatch for {dst}: {got} != {expected}')
-                  dst.parent.mkdir(parents=True, exist_ok=True)
-                  dst.write_bytes(data)
+              for chunk_dir,dst,expected,preferred in specs:
+                  parts=sorted(p for p in chunk_dir.iterdir() if p.is_file())
+                  encoded=''.join(''.join(p.read_text(encoding='ascii').split()) for p in parts)
+                  diag.append(f'{dst}: parts={[p.name for p in parts]} sizes={[p.stat().st_size for p in parts]} encoded={len(encoded)}')
+                  data,method=repair_one_char(encoded, expected, preferred)
+                  diag.append(f'{dst}: {method}')
+                  if data is None: raise RuntimeError(f'canonical payload not recovered for {dst}: {method}')
+                  got=hashlib.sha256(data).hexdigest()
+                  if got != expected: raise RuntimeError(f'canonical SHA gate failed for {dst}: {got}')
+                  dst.parent.mkdir(parents=True,exist_ok=True); dst.write_bytes(data)
+                  diag.append(f'{dst}: PASS sha256={got} bytes={len(data)}')
               py_compile.compile('src/runtime-core/archviz/installer.py', doraise=True)
+              diag.append('installer.py py_compile PASS')
               if not Path('src/bootstrap/archviz82/bootstrap_a0.ps1').read_text(encoding='utf-8-sig').strip():
-                  raise RuntimeError('bootstrap_a0.ps1 empty')
-              diag.append('PASS: canonical hashes and syntax gates')
+                  raise RuntimeError('bootstrap empty')
+              diag.append('bootstrap non-empty PASS')
           except Exception:
-              ok = False
-              diag.append('FAIL:\n' + traceback.format_exc())
-
-          Path('.source_payload/HYDRATE_DIAGNOSTIC.txt').write_text('\n'.join(diag) + '\n', encoding='utf-8')
-          Path('.source_payload/HYDRATE_OK').write_text('1\n' if ok else '0\n', encoding='ascii')
+              ok=False; diag.append('FAIL:\n'+traceback.format_exc())
+          Path('.source_payload/HYDRATE_DIAGNOSTIC.txt').write_text('\n'.join(diag)+'\n',encoding='utf-8')
+          Path('.source_payload/HYDRATE_OK').write_text('1\n' if ok else '0\n',encoding='ascii')
           PY
-      - name: Commit exact source or diagnostic
+      - name: Commit canonical source or diagnostic
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -90,6 +118,6 @@ jobs:
             git commit -m "Hydrate exact frozen A0 source" || exit 0
           else
             git add .source_payload/HYDRATE_DIAGNOSTIC.txt .source_payload/HYDRATE_OK
-            git commit -m "Record A0 hydration diagnostic" || exit 0
+            git commit -m "Record canonical transport repair result" || exit 0
           fi
           git push
