@@ -14,24 +14,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Rehydrate exact frozen sources
+      - name: Rehydrate exact frozen sources from chunked payloads
         shell: python
         run: |
-          import gzip, hashlib
+          import base64, gzip, hashlib
           from pathlib import Path
-          pairs = [
-              (Path('.source_payload/bootstrap_a0.ps1.gz'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'),
-              (Path('.source_payload/installer.py.gz'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'),
+          specs = [
+              (Path('.source_payload/chunks/bootstrap'), Path('src/bootstrap/archviz82/bootstrap_a0.ps1'), '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'),
+              (Path('.source_payload/chunks/installer'), Path('src/runtime-core/archviz/installer.py'), 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'),
           ]
-          for src, dst, expected in pairs:
-              data = gzip.decompress(src.read_bytes())
+          for chunk_dir, dst, expected in specs:
+              parts = sorted(p for p in chunk_dir.iterdir() if p.is_file())
+              if not parts:
+                  raise SystemExit(f'no payload chunks for {dst}')
+              encoded = ''.join(p.read_text(encoding='ascii') for p in parts)
+              packed = base64.b64decode(encoded, validate=True)
+              data = gzip.decompress(packed)
               got = hashlib.sha256(data).hexdigest()
               if got != expected:
                   raise SystemExit(f'hash mismatch for {dst}: {got} != {expected}')
               dst.parent.mkdir(parents=True, exist_ok=True)
               dst.write_bytes(data)
               print(f'PASS {dst} {got}')
-      - name: Commit hydrated sources
+      - name: Commit hydrated sources and remove transport payload
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
