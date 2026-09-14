@@ -1,0 +1,18 @@
+src/bootstrap/archviz82/bootstrap_a0.ps1: parts=['bootstrap.00', 'bootstrap.01', 'bootstrap.02', 'bootstrap.03', 'bootstrap.04'] sizes=[4000, 4000, 8000, 4000, 344]
+src/bootstrap/archviz82/bootstrap_a0.ps1: encoded_chars=20344 mod4=0
+src/bootstrap/archviz82/bootstrap_a0.ps1: packed_bytes=15257 gzip_magic=1f8b
+FAIL:
+Traceback (most recent call last):
+  File "<stdin>", line 21, in <module>
+  File "/opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/gzip.py", line 557, in decompress
+    return f.read()
+  File "/opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/gzip.py", line 301, in read
+    return self._buffer.read(size)
+  File "/opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/_compression.py", line 118, in readall
+    while data := self.read(sys.maxsize):
+  File "/opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/gzip.py", line 479, in read
+    self._read_eof()
+  File "/opt/hostedtoolcache/Python/3.10.21/x64/lib/python3.10/gzip.py", line 525, in _read_eof
+    raise BadGzipFile("CRC check failed %s != %s" % (hex(crc32),
+gzip.BadGzipFile: CRC check failed 0x46b89193 != 0x8029b6a7
+
