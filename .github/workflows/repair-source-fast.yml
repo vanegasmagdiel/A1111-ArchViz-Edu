@@ -1,0 +1,124 @@
+name: repair-frozen-source-fast
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-source-fast.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Parallel single-character repair and canonical SHA gate
+        shell: bash
+        run: |
+          cat > /tmp/repair.py <<'PY'
+          import base64, gzip, hashlib, zlib, concurrent.futures, os, py_compile, traceback
+          from pathlib import Path
+          ALPH='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+          def raw(blob):
+              flg=blob[3]; i=10
+              if flg&4:
+                  x=int.from_bytes(blob[i:i+2],'little'); i+=2+x
+              if flg&8:
+                  while blob[i]!=0:i+=1
+                  i+=1
+              if flg&16:
+                  while blob[i]!=0:i+=1
+                  i+=1
+              if flg&2:i+=2
+              return zlib.decompress(blob[i:-8],-zlib.MAX_WBITS)
+
+          def candidate_data(s):
+              try:
+                  b=base64.b64decode(s,validate=True)
+                  try:d=gzip.decompress(b)
+                  except Exception:d=raw(b)
+                  return d
+              except Exception:return None
+
+          def worker(args):
+              enc, expected, start, end = args
+              arr=list(enc)
+              for pos in range(start,end):
+                  old=arr[pos]
+                  if old=='=': continue
+                  for c in ALPH:
+                      if c==old: continue
+                      arr[pos]=c
+                      d=candidate_data(''.join(arr))
+                      if d is not None and hashlib.sha256(d).hexdigest()==expected:
+                          return pos,old,c,base64.b64encode(d).decode('ascii')
+                  arr[pos]=old
+              return None
+
+          def load_enc(folder):
+              ps=sorted(Path(folder).iterdir())
+              return ''.join(''.join(p.read_text(encoding='ascii').split()) for p in ps if p.is_file())
+
+          diag=[]; ok=True
+          try:
+              benc=load_enc('.source_payload/chunks/bootstrap')
+              bexp='40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'
+              d=candidate_data(benc)
+              if d is None or hashlib.sha256(d).hexdigest()!=bexp:
+                  # Most likely damaged transport chunk is bootstrap.02 => global chars 8000:16000.
+                  bounds=[(8000,10000),(10000,12000),(12000,14000),(14000,16000)]
+                  with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:
+                      futs=[ex.submit(worker,(benc,bexp,a,b)) for a,b in bounds]
+                      found=None
+                      for f in concurrent.futures.as_completed(futs):
+                          r=f.result()
+                          if r:
+                              found=r
+                              for x in futs:x.cancel()
+                              break
+                  if not found:
+                      raise RuntimeError('No one-character canonical repair found in bootstrap.02 range')
+                  pos,old,new,b64=found; d=base64.b64decode(b64)
+                  diag.append(f'bootstrap canonical repair: pos={pos} {old}->{new}')
+              if hashlib.sha256(d).hexdigest()!=bexp: raise RuntimeError('bootstrap SHA gate')
+              Path('src/bootstrap/archviz82/bootstrap_a0.ps1').write_bytes(d)
+              diag.append('bootstrap PASS '+bexp)
+
+              ienc=load_enc('.source_payload/chunks/installer')
+              iexp='d88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'
+              idata=candidate_data(ienc)
+              if idata is None or hashlib.sha256(idata).hexdigest()!=iexp:
+                  raise RuntimeError('installer transport is not canonical; separate repair required')
+              Path('src/runtime-core/archviz/installer.py').write_bytes(idata)
+              py_compile.compile('src/runtime-core/archviz/installer.py',doraise=True)
+              diag.append('installer PASS '+iexp)
+          except Exception:
+              ok=False; diag.append(traceback.format_exc())
+          Path('/tmp/REPAIR_OK').write_text('1' if ok else '0')
+          Path('/tmp/REPAIR_DIAG').write_text('\n'.join(diag)+'\n')
+          print('\n'.join(diag),flush=True)
+          PY
+          python /tmp/repair.py
+      - name: Commit recovered canonical sources
+        if: always()
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$(cat /tmp/REPAIR_OK)" = "1" ]; then
+            rm -rf .source_payload
+            rm -f .github/workflows/hydrate-source.yml .github/workflows/repair-source-fast.yml
+            git add -A
+            git commit -m "Restore canonical frozen A0 sources" || exit 0
+            git push
+          else
+            cp /tmp/REPAIR_DIAG .source_payload/FAST_REPAIR_DIAGNOSTIC.txt
+            git add .source_payload/FAST_REPAIR_DIAGNOSTIC.txt
+            git commit -m "Record fast source repair diagnostic" || exit 0
+            git push
+            exit 1
+          fi
