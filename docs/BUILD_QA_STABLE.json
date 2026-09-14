@@ -1,0 +1,33 @@
+{
+  "schema": "archviz.build.qa.v1",
+  "version": "8.2.0-A0-STABLE",
+  "status": "PASS",
+  "functional_delta": "NONE",
+  "packaging_delta": [
+    "unified stable identity",
+    "concise user console",
+    "full technical logs retained",
+    "freeze certificate",
+    "A1 kickoff documentation"
+  ],
+  "checks": {
+    "outer_version_stable": true,
+    "core_filename_stable": true,
+    "outer_receipt_stable": true,
+    "core_version_stable": true,
+    "core_user_agent_stable": true,
+    "console_log_first": true,
+    "console_heartbeat": true,
+    "server_output_filtered": true,
+    "premium_profile_unchanged": true,
+    "lite_profile_unchanged": true,
+    "freeze_certificate": true,
+    "a1_kickoff": true,
+    "single_user_bat": true
+  },
+  "profile_unit_tests": "PASS",
+  "planner_unit_tests": "PASS",
+  "core_sha256": "c982f1e8efecb040bc669a0a20ac9f4a0d6eba1269766311859e1a2dd136e570",
+  "core_hash_contract": "PASS",
+  "installed_root_legacy_identity_audit": "PASS"
+}

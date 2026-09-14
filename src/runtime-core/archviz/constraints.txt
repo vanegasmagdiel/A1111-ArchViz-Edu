@@ -1,0 +1,22 @@
+# Compatibility profile for A1111 v1.10.1 + ControlNet / Python 3.10.
+numpy==1.26.2
+torch==2.1.2
+torchvision==0.16.2
+mediapipe==0.10.9
+protobuf==3.20.0
+opencv-python==4.10.0.84+archviz1
+opencv-python-headless==4.10.0.84+archviz1
+opencv-contrib-python==4.10.0.84
+albumentations==1.4.3
+controlnet-aux==0.0.9
+pydantic==1.10.17
+huggingface-hub==0.25.2
+scipy==1.11.4
+scikit-image==0.21.0
+setuptools==69.5.1
+torchmetrics==0.11.4
+numba==0.59.1
+matplotlib==3.8.4
+svglib==1.5.1
+reportlab==4.0.9
+sympy==1.12

@@ -1,0 +1,31 @@
+name: Bug report
+description: Report a reproducible A0/A1 issue
+title: "[BUG] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not post API keys, credentials, or unredacted private paths."
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: v8.2.0-A0-STABLE
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware / backend / profile
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant redacted logs

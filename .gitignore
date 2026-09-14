@@ -1,0 +1,23 @@
+# Generated artifacts
+/dist/
+*.zip
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+# Runtime state
+_archviz_cache/
+_archviz_release/
+_archviz_runtime/
+_archviz_state/
+_archviz_state_a0/
+A1111_ArchViz/
+# Local reports
+reports/
+*.log
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

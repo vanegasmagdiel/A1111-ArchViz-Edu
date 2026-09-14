@@ -1,0 +1,13 @@
+{
+  "id": "CUDA_STABLE",
+  "status": "a0-stable-frozen",
+  "vendor": "NVIDIA",
+  "description": "Backend NVIDIA certificado en A0 STABLE. Clasificación y defaults UI congelados; A1 Backend Capsules afina memoria, flags y rendimiento por perfil.",
+  "runtime_family": "win-x64-python310-torch-cu121",
+  "requires": [
+    "Windows x64",
+    "GPU NVIDIA detectada",
+    "nvidia-smi funcional"
+  ],
+  "install_enabled_in_a0": true
+}

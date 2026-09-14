@@ -1,0 +1,34 @@
+{
+  "schema": "archviz.a0.freeze.v1",
+  "product": "A1111 ArchViz",
+  "version": "8.2.0-A0-STABLE",
+  "status": "FROZEN",
+  "freeze_date": "2026-09-13",
+  "basis": {
+    "windows_e2e": "PASS",
+    "hardware_observed": "NVIDIA GeForce RTX 4080 Laptop GPU / 11.99 GiB",
+    "backend_observed": "CUDA_STABLE",
+    "profile_observed": "PREMIUM",
+    "visible_ui_defaults_observed": {
+      "width": 1024,
+      "height": 1024,
+      "steps": 28,
+      "cfg": 5.5,
+      "sampler": "DPM++ 2M",
+      "scheduler": "Automatic"
+    },
+    "clean_root_visual_audit": "PASS",
+    "real_generation_smoke": "PASS"
+  },
+  "frozen_contract": [
+    "clean install only",
+    "hardware detection",
+    "profile thresholds",
+    "profile UI defaults",
+    "A1111 pin",
+    "ControlNet pin",
+    "verified A0 asset catalog"
+  ],
+  "next_phase": "A1 Backend Capsules",
+  "policy": "No A0 functional changes during A1; critical A0 defects require explicit hotfix."
+}

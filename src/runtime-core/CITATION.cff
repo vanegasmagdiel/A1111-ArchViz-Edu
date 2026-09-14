@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use A1111 ArchViz in teaching, research, or reproducibility work, please cite this software package."
+title: "A1111 ArchViz v8.2 A0 STABLE"
+type: software
+authors:
+  - family-names: "Torres Vanegas"
+    given-names: "Magdiel"
+version: "8.2.0-A0-STABLE"
+date-released: "2026-09-13"
+url: "https://github.com/vanegasmagdiel/A1111-ArchViz-Edu"

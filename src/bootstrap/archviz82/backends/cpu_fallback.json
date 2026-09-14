@@ -1,0 +1,9 @@
+{
+  "id": "CPU_FALLBACK",
+  "status": "diagnostic-only-in-a0",
+  "vendor": "CPU",
+  "description": "Modo de diagnóstico/compatibilidad. A0 no instala todavía SDXL Premium CPU porque no está certificado para experiencia de usuario aceptable.",
+  "runtime_family": "win-x64-cpu-future",
+  "requires": ["Windows x64"],
+  "install_enabled_in_a0": false
+}

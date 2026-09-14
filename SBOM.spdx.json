@@ -1,0 +1,19 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "A1111-ArchViz-v8.2-A0-STABLE-direct-components",
+  "documentNamespace": "https://github.com/vanegasmagdiel/A1111-ArchViz-Edu/spdx/a0-stable-gh-edu-1",
+  "creationInfo": {
+    "created": "2026-09-14T20:00:00Z",
+    "creators": ["Person: Dr. Magdiel Torres Vanegas", "Tool: A1111 ArchViz packaging pass"]
+  },
+  "packages": [
+    {"name":"A1111 ArchViz","SPDXID":"SPDXRef-A1111ArchViz","versionInfo":"8.2.0-A0-STABLE","licenseConcluded":"NOASSERTION","licenseDeclared":"LicenseRef-A1111-ArchViz-Educational-1.0","downloadLocation":"NOASSERTION","copyrightText":"Copyright © 2026 Dr. Magdiel Torres Vanegas"},
+    {"name":"AUTOMATIC1111 stable-diffusion-webui","SPDXID":"SPDXRef-A1111","versionInfo":"v1.10.1","licenseDeclared":"AGPL-3.0-only","downloadLocation":"https://github.com/AUTOMATIC1111/stable-diffusion-webui"},
+    {"name":"sd-webui-controlnet","SPDXID":"SPDXRef-ControlNet","versionInfo":"56cec5b2958edf3b1807b7e7b2b1b5186dbd2f81","licenseDeclared":"GPL-3.0-only","downloadLocation":"https://github.com/Mikubill/sd-webui-controlnet"},
+    {"name":"OpenAI CLIP","SPDXID":"SPDXRef-CLIP","versionInfo":"d50d76daa670286dd6cacf3bcd80b5e4823fc8e1","licenseDeclared":"MIT","downloadLocation":"https://github.com/openai/CLIP"},
+    {"name":"PyTorch","SPDXID":"SPDXRef-PyTorch","versionInfo":"2.1.2","licenseDeclared":"BSD-3-Clause","downloadLocation":"https://github.com/pytorch/pytorch"},
+    {"name":"OpenCV","SPDXID":"SPDXRef-OpenCV","versionInfo":"4.10.0.84","licenseDeclared":"Apache-2.0","downloadLocation":"https://opencv.org/"}
+  ]
+}

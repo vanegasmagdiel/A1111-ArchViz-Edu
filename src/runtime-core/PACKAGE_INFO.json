@@ -1,0 +1,21 @@
+{
+  "name": "A1111 ArchViz Runtime Core",
+  "version": "8.2.0-A0-STABLE",
+  "status": "A0-STABLE-FROZEN",
+  "date": "2026-09-13",
+  "platform": "Windows x64 / NVIDIA CUDA_STABLE",
+  "a1111": {"tag":"v1.10.1","commit":"82a973c04367123ae98bd9abdf80d9eda9b910e2"},
+  "controlnet": {"commit":"56cec5b2958edf3b1807b7e7b2b1b5186dbd2f81","ui_version":"1.1.455"},
+  "vaeapprox": {"size":213777,"sha256":"6c8db511f910184436a613807ce06a729f4cf96bbf7977c7c6c40d5b3e4a8333","materialized_before_first_launch":true},
+  "ui_defaults": {"profile_aware":true,"fail_closed":true,"powershell_utf8_bom_compatible":true,"profiles":{"DIAGNOSTIC":{"resolution":"512x512","steps":20,"cfg":7.0},"LITE":{"resolution":"640x640","steps":20,"cfg":6.0},"STANDARD":{"resolution":"896x896","steps":24,"cfg":6.0},"PREMIUM":{"resolution":"1024x1024","steps":28,"cfg":5.5},"PREMIUM_PLUS":{"resolution":"1024x1024","steps":30,"cfg":5.5},"WORKSTATION":{"resolution":"1024x1024","steps":32,"cfg":5.0}}},
+  "legacy_product_artifacts_in_install_root": false,
+  "copyright":"Copyright © 2026 Dr. Magdiel Torres Vanegas",
+  "release_channel":"stable",
+  "frozen":true,
+  "freeze_date":"2026-09-13",
+  "next_phase":"A1 Backend Capsules",
+  "console_ux":{"technical_output":"_archviz_state/reports/*/*.log","user_console":"concise status + heartbeat + errors","functional_runtime_changed":false},
+  "distribution_revision":"GH-EDU-1",
+  "educational_distribution":true,
+  "license_scope":"Original A1111 ArchViz orchestration: LICENSE.md; third-party components: THIRD_PARTY_NOTICES.md"
+}

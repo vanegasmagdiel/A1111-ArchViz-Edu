@@ -1,0 +1,1 @@
+The original A1111 ArchViz orchestration and educational materials are licensed under the repository-level `LICENSE.md`. Third-party components are not relicensed. Copyright © 2026 Dr. Magdiel Torres Vanegas.

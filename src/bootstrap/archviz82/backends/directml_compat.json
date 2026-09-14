@@ -1,0 +1,9 @@
+{
+  "id": "DIRECTML_COMPAT",
+  "status": "experimental-not-installable-in-a0",
+  "vendor": "AMD/Intel/other",
+  "description": "Backend separado previsto para AMD/Intel. A0 detecta y planifica, pero no instala todavía un runtime DirectML no certificado.",
+  "runtime_family": "win-x64-directml-future",
+  "requires": ["Windows x64", "GPU compatible"],
+  "install_enabled_in_a0": false
+}

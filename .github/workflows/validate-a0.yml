@@ -1,0 +1,21 @@
+name: validate-a0-source
+on:
+  push:
+  pull_request:
+jobs:
+  validate:
+    if: ${{ hashFiles('src/runtime-core/archviz/installer.py') != '' && hashFiles('src/bootstrap/archviz82/bootstrap_a0.ps1') != '' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Repository policy checks
+        run: python tools/validate_repo.py
+      - name: Planner tests
+        working-directory: src/bootstrap/archviz82
+        run: python -m unittest -v test_planner.py
+      - name: Profile tests
+        working-directory: src/runtime-core/archviz
+        run: python -m unittest -v test_profile_defaults.py
