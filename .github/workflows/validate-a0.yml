@@ -10,6 +10,7 @@ on:
       - 'tools/**'
       - '.github/workflows/validate-a0.yml'
   pull_request:
+  workflow_dispatch:
 jobs:
   validate:
     runs-on: windows-latest
@@ -20,6 +21,23 @@ jobs:
           python-version: '3.10'
       - name: Repository policy checks
         run: python tools/validate_repo.py
+      - name: Canonical frozen-source SHA-256 gates
+        shell: pwsh
+        run: |
+          $bootstrap = (Get-FileHash 'src/bootstrap/archviz82/bootstrap_a0.ps1' -Algorithm SHA256).Hash.ToLower()
+          $installer = (Get-FileHash 'src/runtime-core/archviz/installer.py' -Algorithm SHA256).Hash.ToLower()
+          if ($bootstrap -ne '40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f') { throw "bootstrap_a0.ps1 SHA mismatch: $bootstrap" }
+          if ($installer -ne 'd88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2') { throw "installer.py SHA mismatch: $installer" }
+          Write-Host '[PASS] Canonical A0 source hashes'
+      - name: Python syntax gate
+        run: python -m py_compile src/runtime-core/archviz/installer.py src/bootstrap/archviz82/planner.py
+      - name: PowerShell parser gate
+        shell: powershell
+        run: |
+          $tokens=$null; $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'src/bootstrap/archviz82/bootstrap_a0.ps1'), [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List | Out-String | Write-Error; exit 1 }
+          Write-Host '[PASS] bootstrap_a0.ps1 parser'
       - name: Planner tests
         working-directory: src/bootstrap/archviz82
         run: python -m unittest -v test_planner.py
