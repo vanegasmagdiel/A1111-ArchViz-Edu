@@ -2,11 +2,12 @@ name: hydrate-frozen-source
 on:
   push:
     branches: [main]
+    paths:
+      - '.source_payload/**'
 permissions:
   contents: write
 jobs:
   hydrate:
-    if: ${{ hashFiles('.source_payload/READY') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
