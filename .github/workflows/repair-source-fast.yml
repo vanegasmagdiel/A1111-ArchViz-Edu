@@ -9,101 +9,90 @@ permissions:
 jobs:
   repair:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Parallel single-character repair and canonical SHA gate
+      - name: Recover canonical frozen sources by structural transport repair
         shell: bash
         run: |
-          cat > /tmp/repair.py <<'PY'
-          import base64, gzip, hashlib, zlib, concurrent.futures, os, py_compile, traceback
+          python - <<'PY'
+          import base64, gzip, hashlib, zlib, py_compile, traceback
           from pathlib import Path
-          ALPH='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-          def raw(blob):
-              flg=blob[3]; i=10
-              if flg&4:
-                  x=int.from_bytes(blob[i:i+2],'little'); i+=2+x
-              if flg&8:
-                  while blob[i]!=0:i+=1
-                  i+=1
-              if flg&16:
-                  while blob[i]!=0:i+=1
-                  i+=1
-              if flg&2:i+=2
-              return zlib.decompress(blob[i:-8],-zlib.MAX_WBITS)
-
-          def candidate_data(s):
+          def clean(p): return ''.join(p.read_text(encoding='ascii').split())
+          def unpack(enc):
+              b=base64.b64decode(enc,validate=True)
+              try: return gzip.decompress(b)
+              except Exception:
+                  flg=b[3]; i=10
+                  if flg&4:
+                      x=int.from_bytes(b[i:i+2],'little'); i+=2+x
+                  if flg&8:
+                      while b[i]!=0:i+=1
+                      i+=1
+                  if flg&16:
+                      while b[i]!=0:i+=1
+                      i+=1
+                  if flg&2:i+=2
+                  return zlib.decompress(b[i:-8],-zlib.MAX_WBITS)
+          def canonical(enc,sha):
               try:
-                  b=base64.b64decode(s,validate=True)
-                  try:d=gzip.decompress(b)
-                  except Exception:d=raw(b)
-                  return d
+                  d=unpack(enc)
+                  return d if hashlib.sha256(d).hexdigest()==sha else None
               except Exception:return None
-
-          def worker(args):
-              enc, expected, start, end = args
-              arr=list(enc)
-              for pos in range(start,end):
-                  old=arr[pos]
-                  if old=='=': continue
-                  for c in ALPH:
-                      if c==old: continue
-                      arr[pos]=c
-                      d=candidate_data(''.join(arr))
-                      if d is not None and hashlib.sha256(d).hexdigest()==expected:
-                          return pos,old,c,base64.b64encode(d).decode('ascii')
-                  arr[pos]=old
-              return None
-
-          def load_enc(folder):
-              ps=sorted(Path(folder).iterdir())
-              return ''.join(''.join(p.read_text(encoding='ascii').split()) for p in ps if p.is_file())
 
           diag=[]; ok=True
           try:
-              benc=load_enc('.source_payload/chunks/bootstrap')
+              bd=Path('.source_payload/chunks/bootstrap')
+              parts=[clean(bd/f'bootstrap.{i:02d}') for i in range(5)]
+              diag.append('bootstrap lengths='+str([len(x) for x in parts]))
               bexp='40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f'
-              d=candidate_data(benc)
-              if d is None or hashlib.sha256(d).hexdigest()!=bexp:
-                  # Most likely damaged transport chunk is bootstrap.02 => global chars 8000:16000.
-                  bounds=[(8000,10000),(10000,12000),(12000,14000),(14000,16000)]
-                  with concurrent.futures.ProcessPoolExecutor(max_workers=4) as ex:
-                      futs=[ex.submit(worker,(benc,bexp,a,b)) for a,b in bounds]
-                      found=None
-                      for f in concurrent.futures.as_completed(futs):
-                          r=f.result()
-                          if r:
-                              found=r
-                              for x in futs:x.cancel()
-                              break
-                  if not found:
-                      raise RuntimeError('No one-character canonical repair found in bootstrap.02 range')
-                  pos,old,new,b64=found; d=base64.b64decode(b64)
-                  diag.append(f'bootstrap canonical repair: pos={pos} {old}->{new}')
-              if hashlib.sha256(d).hexdigest()!=bexp: raise RuntimeError('bootstrap SHA gate')
-              Path('src/bootstrap/archviz82/bootstrap_a0.ps1').write_bytes(d)
-              diag.append('bootstrap PASS '+bexp)
+              candidates=[]
+              # Current .02 is 8000 while the surrounding transport chunks are 4000.
+              # Test all lossless structural interpretations that remove exactly one 4000-char block.
+              p0,p1,p2,p3,p4=parts; h1=p2[:4000]; h2=p2[4000:]
+              blocks=[('00',p0),('01',p1),('02a',h1),('02b',h2),('03',p3)]
+              # Preserve block order and omit exactly one candidate block; trailer .04 is always retained.
+              for omit in range(len(blocks)):
+                  name='omit_'+blocks[omit][0]
+                  enc=''.join(v for j,(n,v) in enumerate(blocks) if j!=omit)+p4
+                  candidates.append((name,enc))
+              # Common accidental-double-write variants.
+              candidates += [
+                  ('02_first_half',p0+p1+h1+p3+p4),
+                  ('02_second_half',p0+p1+h2+p3+p4),
+                  ('omit03_keep02halves',p0+p1+h1+h2+p4),
+              ]
+              bdata=None
+              for name,enc in candidates:
+                  d=canonical(enc,bexp)
+                  diag.append(f'{name}: chars={len(enc)} '+('PASS' if d is not None else 'no'))
+                  if d is not None:
+                      bdata=d; diag.append('bootstrap recovered via '+name); break
+              if bdata is None: raise RuntimeError('No structural bootstrap transport candidate matched canonical SHA')
+              Path('src/bootstrap/archviz82/bootstrap_a0.ps1').write_bytes(bdata)
+              diag.append('bootstrap PASS '+hashlib.sha256(bdata).hexdigest())
 
-              ienc=load_enc('.source_payload/chunks/installer')
+              idir=Path('.source_payload/chunks/installer')
+              ips=sorted(p for p in idir.iterdir() if p.is_file())
+              ienc=''.join(clean(p) for p in ips)
               iexp='d88ad6fad60da8d78bfcd1011695e9869708660514f2e98ce48713efcb596bf2'
-              idata=candidate_data(ienc)
-              if idata is None or hashlib.sha256(idata).hexdigest()!=iexp:
-                  raise RuntimeError('installer transport is not canonical; separate repair required')
+              idata=canonical(ienc,iexp)
+              diag.append('installer lengths='+str([len(clean(p)) for p in ips]))
+              if idata is None: raise RuntimeError('Installer transport did not match canonical SHA')
               Path('src/runtime-core/archviz/installer.py').write_bytes(idata)
               py_compile.compile('src/runtime-core/archviz/installer.py',doraise=True)
-              diag.append('installer PASS '+iexp)
+              diag.append('installer PASS '+hashlib.sha256(idata).hexdigest())
           except Exception:
-              ok=False; diag.append(traceback.format_exc())
+              ok=False; diag.append('FAIL:\n'+traceback.format_exc())
           Path('/tmp/REPAIR_OK').write_text('1' if ok else '0')
           Path('/tmp/REPAIR_DIAG').write_text('\n'.join(diag)+'\n')
-          print('\n'.join(diag),flush=True)
+          print('\n'.join(diag))
           PY
-          python /tmp/repair.py
-      - name: Commit recovered canonical sources
+      - name: Commit canonical sources or diagnostic
         if: always()
         shell: bash
         run: |
@@ -116,9 +105,9 @@ jobs:
             git commit -m "Restore canonical frozen A0 sources" || exit 0
             git push
           else
-            cp /tmp/REPAIR_DIAG .source_payload/FAST_REPAIR_DIAGNOSTIC.txt
-            git add .source_payload/FAST_REPAIR_DIAGNOSTIC.txt
-            git commit -m "Record fast source repair diagnostic" || exit 0
+            cp /tmp/REPAIR_DIAG .source_payload/STRUCTURAL_REPAIR_DIAGNOSTIC.txt
+            git add .source_payload/STRUCTURAL_REPAIR_DIAGNOSTIC.txt
+            git commit -m "Record structural source repair diagnostic" || exit 0
             git push
             exit 1
           fi
