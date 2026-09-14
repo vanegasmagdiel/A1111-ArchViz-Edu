@@ -1,9 +1,0 @@
-src/bootstrap/archviz82/bootstrap_a0.ps1: parts=['bootstrap.00', 'bootstrap.01', 'bootstrap.02', 'bootstrap.03', 'bootstrap.04'] sizes=[4000, 4000, 8000, 4000, 344]
-src/bootstrap/archviz82/bootstrap_a0.ps1: encoded_chars=20344 mod4=0
-src/bootstrap/archviz82/bootstrap_a0.ps1: packed_bytes=15257 gzip_magic=1f8b
-src/bootstrap/archviz82/bootstrap_a0.ps1: method=raw-deflate fallback after CRC check failed 0x46b89193 != 0x8029b6a7; decoded_bytes=63195 sha256=b0c7763e1b1f5ce19e7b17e1537e346f6beb9f70bbfd6471b8f86bc18cbd8fa6 expected=40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f
-FAIL:
-Traceback (most recent call last):
-  File "<stdin>", line 48, in <module>
-RuntimeError: hash mismatch for src/bootstrap/archviz82/bootstrap_a0.ps1: b0c7763e1b1f5ce19e7b17e1537e346f6beb9f70bbfd6471b8f86bc18cbd8fa6 != 40b033586df0cb9c6a20aa0bcdaaa24247a7389ee00e5b7d52f6490274d19e5f
-

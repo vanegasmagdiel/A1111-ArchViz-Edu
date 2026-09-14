@@ -1,5 +1,0 @@
-Traceback (most recent call last):
-  File "/tmp/repair.py", line 63, in <module>
-    raise RuntimeError('No one-character canonical repair found in bootstrap.02 range')
-RuntimeError: No one-character canonical repair found in bootstrap.02 range
-
